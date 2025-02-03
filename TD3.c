@@ -135,33 +135,33 @@ int main() {
 
 
 
-    const char *input_file = "enregistrement-bruit.txt"; // Input file name
-    const char *output_file = "sortie.txt"; // Output file name
+    const char *input_file = "enregistrement-bruit.txt"; // nom du fichier entrée
+    const char *output_file = "sortie.txt"; // nom du fichier sortie
 
 
-    // Allocate memory for input and output arrays
-    double bruit[10000]; // Input array
-    double sortie[10000]; // Output array
+    
+    double bruit[10000]; // array de l'entrée
+    double sortie[10000]; // array de la sortie
 
-    // Read input data from file
+    // Lire l'entrée 
     int taille_bruit = LireEntree(input_file, bruit);
     if (taille_bruit < 0) {
         fprintf(stderr, "Erreur lors de la lecture du fichier d'entrée.\n");
-        return 1; // Exit with error
+        return 1; // Sortir si erreurr
     }
 
-    // Perform filtering
+    // filtrage
     int result = filtrage(u, taille_bruit, sortie, taille_bruit, K, tau, Te);
     if (result < 0) {
         fprintf(stderr, "Erreur lors du filtrage des données.\n");
-        return 1; // Exit with error
+        return 1; // Sortir si erreur
     }
 
-    // Write output data to file
+    // écrire le signal de sortie
     int taille_ecrite = EcrireSortie(output_file, sortie, taille_bruit);
     if (taille_ecrite < 0) {
         fprintf(stderr, "Erreur lors de l'écriture du fichier de sortie.\n");
-        return 1; // Exit with error
+        return 1; // Sortie si erreur
     }
 
     printf("Traitement terminé avec succès. %d valeurs écrites dans %s.\n", taille_ecrite, output_file);
