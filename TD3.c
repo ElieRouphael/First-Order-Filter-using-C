@@ -60,6 +60,25 @@ int LireEntree(const char *nom_fichier, double *valeurs) {
     return compteur; // Retourner le nombre de valeurs lues
 }
 
+int EcrireSortie(const char *nom_fichier, double *valeurs, int taille) {
+    FILE *fichier = fopen(nom_fichier, "w"); // Ouvrir le fichier en mode écriture
+    if (fichier == NULL) {
+        return -1; // Erreur d'ouverture du fichier
+    }
+
+    int compteur;
+    for (compteur = 0; compteur < taille; compteur++) {
+        // Écrire chaque valeur dans le fichier suivie d'un saut de ligne
+        if (fprintf(fichier, "%.2f\n", valeurs[compteur]) < 0) {
+            fclose(fichier); // Fermer le fichier en cas d'erreur
+            return -1; // Erreur d'écriture
+        }
+    }
+
+    fclose(fichier); // Fermer le fichier
+    return compteur; // Retourner le nombre de valeurs écrites
+}
+
 int main() {
     // Paramètres du filtre
     double K = 2.0; // Gain statique
@@ -109,6 +128,44 @@ int main() {
     for (int i = 0; i < nombre_valeurs; i++) {
         printf("%.2f\n", valeurs[i]);
     }
+
+
+
+
+
+
+
+    const char *input_file = "enregistrement-bruit.txt"; // Input file name
+    const char *output_file = "sortie.txt"; // Output file name
+
+
+    // Allocate memory for input and output arrays
+    double bruit[10000]; // Input array
+    double sortie[10000]; // Output array
+
+    // Read input data from file
+    int taille_bruit = LireEntree(input_file, bruit);
+    if (taille_bruit < 0) {
+        fprintf(stderr, "Erreur lors de la lecture du fichier d'entrée.\n");
+        return 1; // Exit with error
+    }
+
+    // Perform filtering
+    int result = filtrage(u, taille_bruit, sortie, taille_bruit, K, tau, Te);
+    if (result < 0) {
+        fprintf(stderr, "Erreur lors du filtrage des données.\n");
+        return 1; // Exit with error
+    }
+
+    // Write output data to file
+    int taille_ecrite = EcrireSortie(output_file, sortie, taille_bruit);
+    if (taille_ecrite < 0) {
+        fprintf(stderr, "Erreur lors de l'écriture du fichier de sortie.\n");
+        return 1; // Exit with error
+    }
+
+    printf("Traitement terminé avec succès. %d valeurs écrites dans %s.\n", taille_ecrite, output_file);
+
 
     return 0;
 }
