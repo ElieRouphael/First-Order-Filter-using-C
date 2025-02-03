@@ -20,7 +20,7 @@ int filtrage(double *u, int taille_u, double *y, int taille_y, double K, double 
     return 0; // Succès
 }
 
-int LireEntree(const char *nom_fichier, double *valeurs) {
+/*int LireEntree(const char *nom_fichier, double *valeurs) {
     FILE *fichier = fopen(nom_fichier, "r"); // Ouvrir le fichier en mode lecture
     if (fichier == NULL) {
         return -1; // Erreur d'ouverture du fichier
@@ -28,6 +28,31 @@ int LireEntree(const char *nom_fichier, double *valeurs) {
 
     int compteur = 0; // Compteur pour le nombre de valeurs lues
     while (compteur < 10000 && fscanf(fichier, "%lf", &valeurs[compteur]) == 1) {
+        compteur++;
+    }
+
+    fclose(fichier); // Fermer le fichier
+    return compteur; // Retourner le nombre de valeurs lues
+}*/
+
+int LireEntree(const char *nom_fichier, double *valeurs) {
+    FILE *fichier = fopen(nom_fichier, "r"); // Ouvrir le fichier en mode lecture
+    if (fichier == NULL) {
+        return -1; // Erreur d'ouverture du fichier
+    }
+
+    int compteur = 0; // Compteur pour le nombre de valeurs lues
+    while (compteur < 10000) {
+        // Lire une valeur
+        if (fscanf(fichier, "%lf", &valeurs[compteur]) != 1) {
+            // Vérifier si on a atteint la fin du fichier
+            if (feof(fichier)) {
+                break; // Fin de fichier atteinte
+            } else {
+                fclose(fichier); // Fermer le fichier en cas d'erreur
+                return -1; // Erreur de lecture
+            }
+        }
         compteur++;
     }
 
