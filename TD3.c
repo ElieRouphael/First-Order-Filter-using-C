@@ -1,16 +1,20 @@
 #include <stdio.h>
+#include <math.h>
 
 int filtrage(double *u, int taille_u, double *y, int taille_y, double K, double tau, double Te) {
     if (taille_u != taille_y) {
         return -1; // Erreur : les tailles des tableaux ne correspondent pas
     }
 
+    // Calcul de z0
+    double z0 = exp(-Te / tau);
+
     // Initialisation de la première valeur de y
     y[0] = 0; // On peut initialiser à 0 ou à une autre valeur selon le besoin
 
     // Calcul du filtrage passe-bas
-    for (int n = 1; n < taille_u; n++) {
-        y[n] = y[n - 1] + (Te / tau) * (K * u[n] - y[n - 1]);
+    for (int k = 1; k < taille_u; k++) {
+        y[k] = z0 * y[k - 1] + K * (1 - z0) * u[k - 1];
     }
 
     return 0; // Succès
