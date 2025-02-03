@@ -79,10 +79,63 @@ int EcrireSortie(const char *nom_fichier, double *valeurs, int taille) {
     return compteur; // Retourner le nombre de valeurs écrites
 }
 
+
+int ChercheMinMax(double *tableau, int taille, double *min, double *max) {
+    if (taille <= 0) {
+        return -1; // Erreur : tableau vide
+    }
+
+    *min = tableau[0];
+    *max = tableau[0];
+
+    for (int i = 1; i < taille; i++) {
+        if (tableau[i] < *min) {
+            *min = tableau[i];
+        }
+        if (tableau[i] > *max) {
+            *max = tableau[i];
+        }
+    }
+
+    return 0; // Succès
+}
+
+int CalculeHistogramme(double *tableau, int taille, int *histogramme, int nb_bins) {
+    if (taille <= 0 || nb_bins <= 0) {
+        return -1; // Erreur : tableau vide ou nombre de bins invalide
+    }
+
+    // Trouver les valeurs min et max
+    double min, max;
+    ChercheMinMax(tableau, taille, &min, &max);
+
+    // Initialiser l'histogramme
+    for (int i = 0; i < nb_bins; i++) {
+        histogramme[i] = 0;
+    }
+
+    // Calculer la largeur de chaque bin
+    double largeur_bin = (max - min) / nb_bins;
+
+    // Remplir l'histogramme
+    for (int i = 0; i < taille; i++) {
+        int index = (tableau[i] - min) / largeur_bin;
+        if (index >= nb_bins) {
+            index = nb_bins - 1; // Assurer que l'index ne dépasse pas le nombre de bins
+        }
+        if (index >= 0) {
+            histogramme[index]++;
+        }
+    }
+
+    return 0; // Succès
+}
+
+
 int main() {
     // Paramètres du filtre
-    double K = 2.0; // Gain statique
-    double tau = 0.15; // Constante de temps
+    double K = 1.0; // Gain statique
+    double tau = 2; // Constante de temps
     double Te = 0.01; // Période d'échantillonnage
     double duree = 0.5; // Durée de l'échantillonnage
     int taille = (int)(duree / Te) + 1; // Nombre d'échantillons
@@ -166,6 +219,24 @@ int main() {
 
     printf("Traitement terminé avec succès. %d valeurs écrites dans %s.\n", taille_ecrite, output_file);
 
+
+
+    double difference[500];
+    int histogramme[16]; // Histogramme avec 16 bins
+
+    // Calculer la différence entre les données brutes et filtrées
+    for (int i = 0; i < 500; i++) {
+        difference[i] = bruit[i] - sortie[i];
+    }
+
+    // Calculer l'histogramme de la différence
+    CalculeHistogramme(difference, 500, histogramme, 16);
+
+    // Afficher les valeurs de l'histogramme
+    printf("Histogramme de la différence :\n");
+    for (int i = 0; i < 16; i++) {
+        printf("Bin %d : %d\n", i, histogramme[i]);
+    }
 
     return 0;
 }
