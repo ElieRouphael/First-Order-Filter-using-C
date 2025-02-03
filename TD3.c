@@ -20,6 +20,21 @@ int filtrage(double *u, int taille_u, double *y, int taille_y, double K, double 
     return 0; // Succès
 }
 
+int LireEntree(const char *nom_fichier, double *valeurs) {
+    FILE *fichier = fopen(nom_fichier, "r"); // Ouvrir le fichier en mode lecture
+    if (fichier == NULL) {
+        return -1; // Erreur d'ouverture du fichier
+    }
+
+    int compteur = 0; // Compteur pour le nombre de valeurs lues
+    while (compteur < 10000 && fscanf(fichier, "%lf", &valeurs[compteur]) == 1) {
+        compteur++;
+    }
+
+    fclose(fichier); // Fermer le fichier
+    return compteur; // Retourner le nombre de valeurs lues
+}
+
 int main() {
     // Paramètres du filtre
     double K = 2.0; // Gain statique
@@ -47,6 +62,27 @@ int main() {
     printf("Temps (s)\tSignal d'entrée (u)\tSignal de sortie (y)\n");
     for (int i = 0; i < taille; i++) {
         printf("%.2f\t\t%.2f\t\t\t%.2f\n", i * Te, u[i], y[i]);
+    }
+
+
+
+
+
+
+
+    double valeurs[10000]; // Tableau pour stocker les valeurs
+    const char *nom_fichier = "enregistrement-bruit.txt"; // Nom du fichier à lire
+
+    int nombre_valeurs = LireEntree(nom_fichier, valeurs);
+    if (nombre_valeurs == -1) {
+        printf("Erreur lors de la lecture du fichier.\n");
+        return -1;
+    }
+
+    // Affichage des valeurs lues
+    printf("Valeurs lues (%d valeurs) :\n", nombre_valeurs);
+    for (int i = 0; i < nombre_valeurs; i++) {
+        printf("%.2f\n", valeurs[i]);
     }
 
     return 0;
