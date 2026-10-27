@@ -1,242 +1,179 @@
+/* TD3.c -- first-order low-pass filter in C: the coursework program with three corrections (see README.md).
+   "A first-order filter in C" (Kalman Filters with JAX, chapter 05), plus a real-time form of the filter.
+
+   1. filtrage() is applied to the recorded signal `bruit`, not to the 51-sample self-test array `u`
+      (the original read 199 cells past the end of `u` and wrote a file of zeros).
+   2. The difference and its histogram cover the `taille_bruit` values actually read, not 500.
+   3. The self-test is a unit step printed with four decimals, and tau is chosen for the recording
+      (0.02 s; the original 2 s attenuated the 1 Hz signal to 8%).
+
+   Build:  gcc -Wall -Wextra -o td3_fixed TD3_fixed.c
+   Run in the folder that holds enregistrement-bruit.txt. */
 #include <stdio.h>
 #include <math.h>
 
-int filtrage(double *u, int taille_u, double *y, int taille_y, double K, double tau, double Te) {
-    if (taille_u != taille_y) {
-        return -1; // Erreur : les tailles des tableaux ne correspondent pas
+#define MAX_VALEURS 10000
+
+/* Batch form: y[k] = z0 y[k-1] + K (1 - z0) u[k-1], the exact zero-order-hold discretisation of tau y' + y = K u. */
+int filtrage(const double *u, int taille_u, double *y, int taille_y, double K, double tau, double Te) {
+    if (taille_u != taille_y || taille_u < 1) {
+        return -1;
     }
-
-    // Calcul de z0
     double z0 = exp(-Te / tau);
-
-    // Initialisation de la première valeur de y
-    y[0] = 0; // On peut initialiser à 0 ou à une autre valeur selon le besoin
-
-    // Calcul du filtrage passe-bas
+    y[0] = 0;
     for (int k = 1; k < taille_u; k++) {
         y[k] = z0 * y[k - 1] + K * (1 - z0) * u[k - 1];
     }
-
-    return 0; // Succès
+    return 0;
 }
 
-/*int LireEntree(const char *nom_fichier, double *valeurs) {
-    FILE *fichier = fopen(nom_fichier, "r"); // Ouvrir le fichier en mode lecture
+/* Real-time form: one sample in, one sample out, state kept by the caller. */
+typedef struct {
+    double z0, b, y_prev, u_prev;
+} Filtre;
+
+void filtre_init(Filtre *f, double K, double tau, double Te) {
+    f->z0 = exp(-Te / tau);
+    f->b = K * (1 - f->z0);
+    f->y_prev = 0;
+    f->u_prev = 0;
+}
+
+double filtre_step(Filtre *f, double u) {
+    double y = f->z0 * f->y_prev + f->b * f->u_prev;
+    f->y_prev = y;
+    f->u_prev = u;
+    return y;
+}
+
+int LireEntree(const char *nom_fichier, double *valeurs, int max_valeurs) {
+    FILE *fichier = fopen(nom_fichier, "r");
     if (fichier == NULL) {
-        return -1; // Erreur d'ouverture du fichier
+        return -1;
     }
-
-    int compteur = 0; // Compteur pour le nombre de valeurs lues
-    while (compteur < 10000 && fscanf(fichier, "%lf", &valeurs[compteur]) == 1) {
-        compteur++;
-    }
-
-    fclose(fichier); // Fermer le fichier
-    return compteur; // Retourner le nombre de valeurs lues
-}*/
-
-int LireEntree(const char *nom_fichier, double *valeurs) {
-    FILE *fichier = fopen(nom_fichier, "r"); // Ouvrir le fichier en mode lecture
-    if (fichier == NULL) {
-        return -1; // Erreur d'ouverture du fichier
-    }
-
-    int compteur = 0; // Compteur pour le nombre de valeurs lues
-    while (compteur < 10000) {
-        // Lire une valeur
+    int compteur = 0;
+    while (compteur < max_valeurs) {
         if (fscanf(fichier, "%lf", &valeurs[compteur]) != 1) {
-            // Vérifier si on a atteint la fin du fichier
             if (feof(fichier)) {
-                break; // Fin de fichier atteinte
-            } else {
-                fclose(fichier); // Fermer le fichier en cas d'erreur
-                return -1; // Erreur de lecture
+                break;
             }
+            fclose(fichier);
+            return -1;
         }
         compteur++;
     }
-
-    fclose(fichier); // Fermer le fichier
-    return compteur; // Retourner le nombre de valeurs lues
+    fclose(fichier);
+    return compteur;
 }
 
-int EcrireSortie(const char *nom_fichier, double *valeurs, int taille) {
-    FILE *fichier = fopen(nom_fichier, "w"); // Ouvrir le fichier en mode écriture
+int EcrireSortie(const char *nom_fichier, const double *valeurs, int taille) {
+    FILE *fichier = fopen(nom_fichier, "w");
     if (fichier == NULL) {
-        return -1; // Erreur d'ouverture du fichier
+        return -1;
     }
-
-    int compteur;
-    for (compteur = 0; compteur < taille; compteur++) {
-        // Écrire chaque valeur dans le fichier suivie d'un saut de ligne
-        if (fprintf(fichier, "%.2f\n", valeurs[compteur]) < 0) {
-            fclose(fichier); // Fermer le fichier en cas d'erreur
-            return -1; // Erreur d'écriture
+    for (int i = 0; i < taille; i++) {
+        if (fprintf(fichier, "%.4f\n", valeurs[i]) < 0) {
+            fclose(fichier);
+            return -1;
         }
     }
-
-    fclose(fichier); // Fermer le fichier
-    return compteur; // Retourner le nombre de valeurs écrites
+    fclose(fichier);
+    return taille;
 }
 
-
-int ChercheMinMax(double *tableau, int taille, double *min, double *max) {
+int ChercheMinMax(const double *tableau, int taille, double *min, double *max) {
     if (taille <= 0) {
-        return -1; // Erreur : tableau vide
+        return -1;
     }
-
     *min = tableau[0];
     *max = tableau[0];
-
     for (int i = 1; i < taille; i++) {
-        if (tableau[i] < *min) {
-            *min = tableau[i];
-        }
-        if (tableau[i] > *max) {
-            *max = tableau[i];
-        }
+        if (tableau[i] < *min) *min = tableau[i];
+        if (tableau[i] > *max) *max = tableau[i];
     }
-
-    return 0; // Succès
+    return 0;
 }
 
-int CalculeHistogramme(double *tableau, int taille, int *histogramme, int nb_bins) {
+int CalculeHistogramme(const double *tableau, int taille, int *histogramme, int nb_bins) {
     if (taille <= 0 || nb_bins <= 0) {
-        return -1; // Erreur : tableau vide ou nombre de bins invalide
+        return -1;
     }
-
-    // Trouver les valeurs min et max
     double min, max;
     ChercheMinMax(tableau, taille, &min, &max);
-
-    // Initialiser l'histogramme
     for (int i = 0; i < nb_bins; i++) {
         histogramme[i] = 0;
     }
-
-    // Calculer la largeur de chaque bin
     double largeur_bin = (max - min) / nb_bins;
-
-    // Remplir l'histogramme
-    for (int i = 0; i < taille; i++) {
-        int index = (tableau[i] - min) / largeur_bin;
-        if (index >= nb_bins) {
-            index = nb_bins - 1; // Assurer que l'index ne dépasse pas le nombre de bins
-        }
-        if (index >= 0) {
-            histogramme[index]++;
-        }
+    if (largeur_bin <= 0) {          /* all values equal: everything in the first bin */
+        histogramme[0] = taille;
+        return 0;
     }
-
-    return 0; // Succès
+    for (int i = 0; i < taille; i++) {
+        int index = (int)((tableau[i] - min) / largeur_bin);
+        if (index >= nb_bins) index = nb_bins - 1;
+        if (index >= 0) histogramme[index]++;
+    }
+    return 0;
 }
 
+int main(void) {
+    const double K = 1.0;      /* static gain */
+    const double tau = 0.02;   /* time constant, chosen for a 1 Hz signal sampled at 100 Hz */
+    const double Te = 0.01;    /* sampling period */
 
-int main() {
-    // Paramètres du filtre
-    double K = 1.0; // Gain statique
-    double tau = 2; // Constante de temps
-    double Te = 0.01; // Période d'échantillonnage
-    double duree = 0.5; // Durée de l'échantillonnage
-    int taille = (int)(duree / Te) + 1; // Nombre d'échantillons
-
-    // Allocation des tableaux
-    double u[taille]; // Signal d'entrée
-    double y[taille]; // Signal de sortie
-
-    // Remplissage du tableau d'entrée avec une réponse indicielle
-    for (int i = 0; i < taille; i++) {
-        u[i] = (i == 0) ? 1.0 : 0.0; // Impulsion à t=0
+    /* ---- self-test: unit step, 63.2% after tau/Te samples, 99.3% after 5 tau/Te ---- */
+    const int n_test = 51;
+    double u[51], y[51];
+    for (int i = 0; i < n_test; i++) u[i] = 1.0;
+    if (filtrage(u, n_test, y, n_test, K, tau, Te) != 0) {
+        fprintf(stderr, "Erreur lors du filtrage de test\n");
+        return 1;
     }
+    int n_tau = (int)(tau / Te + 0.5);
+    int ok = y[n_tau] > 0.60 * K && y[n_tau] < 0.67 * K && y[5 * n_tau] > 0.99 * K;
+    printf("Test indiciel : y[%d] = %.4f (attendu 0.632), y[%d] = %.4f (attendu 0.993) : %s\n",
+           n_tau, y[n_tau], 5 * n_tau, y[5 * n_tau], ok ? "PASS" : "FAIL");
+    if (!ok) return 1;
 
-    // Appel de la fonction de filtrage
-    if (filtrage(u, taille, y, taille, K, tau, Te) != 0) {
-        printf("Erreur lors du filtrage\n");
-        return -1;
-    }
-
-    // Affichage des résultats
-    printf("Temps (s)\tSignal d'entrée (u)\tSignal de sortie (y)\n");
-    for (int i = 0; i < taille; i++) {
-        printf("%.2f\t\t%.2f\t\t\t%.2f\n", i * Te, u[i], y[i]);
-    }
-
-
-
-
-
-
-
-    double valeurs[10000]; // Tableau pour stocker les valeurs
-    const char *nom_fichier = "enregistrement-bruit.txt"; // Nom du fichier à lire
-
-    int nombre_valeurs = LireEntree(nom_fichier, valeurs);
-    if (nombre_valeurs == -1) {
-        printf("Erreur lors de la lecture du fichier.\n");
-        return -1;
-    }
-
-    // Affichage des valeurs lues
-    printf("Valeurs lues (%d valeurs) :\n", nombre_valeurs);
-    for (int i = 0; i < nombre_valeurs; i++) {
-        printf("%.2f\n", valeurs[i]);
-    }
-
-
-
-
-
-
-
-    const char *input_file = "enregistrement-bruit.txt"; // nom du fichier entrée
-    const char *output_file = "sortie.txt"; // nom du fichier sortie
-
-
-    
-    double bruit[10000]; // array de l'entrée
-    double sortie[10000]; // array de la sortie
-
-    // Lire l'entrée 
-    int taille_bruit = LireEntree(input_file, bruit);
+    /* ---- the recording ---- */
+    static double bruit[MAX_VALEURS], sortie[MAX_VALEURS], sortie_rt[MAX_VALEURS], difference[MAX_VALEURS];
+    int taille_bruit = LireEntree("enregistrement-bruit.txt", bruit, MAX_VALEURS);
     if (taille_bruit < 0) {
-        fprintf(stderr, "Erreur lors de la lecture du fichier d'entrée.\n");
-        return 1; // Sortir si erreurr
+        fprintf(stderr, "Erreur lors de la lecture du fichier d'entree.\n");
+        return 1;
+    }
+    if (filtrage(bruit, taille_bruit, sortie, taille_bruit, K, tau, Te) < 0) {   /* fix 1: bruit, not u */
+        fprintf(stderr, "Erreur lors du filtrage des donnees.\n");
+        return 1;
     }
 
-    // filtrage
-    int result = filtrage(u, taille_bruit, sortie, taille_bruit, K, tau, Te);
-    if (result < 0) {
-        fprintf(stderr, "Erreur lors du filtrage des données.\n");
-        return 1; // Sortir si erreur
+    /* the real-time form must give the same samples */
+    Filtre f;
+    filtre_init(&f, K, tau, Te);
+    double ecart = 0;
+    for (int i = 0; i < taille_bruit; i++) {
+        sortie_rt[i] = filtre_step(&f, bruit[i]);
+        double d = fabs(sortie_rt[i] - sortie[i]);
+        if (d > ecart) ecart = d;
     }
+    printf("Forme temps reel : ecart maximal avec filtrage() = %.3e\n", ecart);
 
-    // écrire le signal de sortie
-    int taille_ecrite = EcrireSortie(output_file, sortie, taille_bruit);
+    int taille_ecrite = EcrireSortie("sortie.txt", sortie, taille_bruit);
     if (taille_ecrite < 0) {
-        fprintf(stderr, "Erreur lors de l'écriture du fichier de sortie.\n");
-        return 1; // Sortie si erreur
+        fprintf(stderr, "Erreur lors de l'ecriture du fichier de sortie.\n");
+        return 1;
     }
+    printf("Traitement termine avec succes. %d valeurs ecrites dans sortie.txt.\n", taille_ecrite);
 
-    printf("Traitement terminé avec succès. %d valeurs écrites dans %s.\n", taille_ecrite, output_file);
-
-
-
-    double difference[500];
-    int histogramme[16]; // Histogramme avec 16 bins
-
-    // Calculer la différence entre les données brutes et filtrées
-    for (int i = 0; i < 500; i++) {
+    /* ---- histogram of what the filter removed (fix 2: over the values read) ---- */
+    int histogramme[16];
+    for (int i = 0; i < taille_bruit; i++) {
         difference[i] = bruit[i] - sortie[i];
     }
-
-    // Calculer l'histogramme de la différence
-    CalculeHistogramme(difference, 500, histogramme, 16);
-
-    // Afficher les valeurs de l'histogramme
-    printf("Histogramme de la différence :\n");
+    CalculeHistogramme(difference, taille_bruit, histogramme, 16);
+    printf("Histogramme de la difference (%d valeurs, 16 classes) :\n", taille_bruit);
     for (int i = 0; i < 16; i++) {
-        printf("Bin %d : %d\n", i, histogramme[i]);
+        printf("Classe %2d : %d\n", i, histogramme[i]);
     }
-
     return 0;
 }
