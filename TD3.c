@@ -2,12 +2,13 @@
    "A first-order filter in C" (Kalman Filters with JAX, chapter 05), plus a real-time form of the filter.
 
    1. filtrage() is applied to the recorded signal `bruit`, not to the 51-sample self-test array `u`
-      (the original read 199 cells past the end of `u` and wrote a file of zeros).
+      (the original read 198 cells past the end of `u` and wrote a file of zeros).
    2. The difference and its histogram cover the `taille_bruit` values actually read, not 500.
-   3. The self-test is a unit step printed with four decimals, and tau is chosen for the recording
-      (0.02 s; the original 2 s attenuated the 1 Hz signal to 8%).
+   3. The self-test is a unit step printed with four decimals, and tau is 0.02 s, chosen to pass the 1 Hz
+      sine almost intact (gain 0.99, lag 9 deg) rather than to remove noise (see README.md); the original
+      2 s attenuated it to 8%.
 
-   Build:  gcc -Wall -Wextra -o td3_fixed TD3_fixed.c
+   Build:  gcc -Wall -Wextra -o td3 TD3.c -lm
    Run in the folder that holds enregistrement-bruit.txt. */
 #include <stdio.h>
 #include <math.h>
@@ -118,7 +119,7 @@ int CalculeHistogramme(const double *tableau, int taille, int *histogramme, int 
 
 int main(void) {
     const double K = 1.0;      /* static gain */
-    const double tau = 0.02;   /* time constant, chosen for a 1 Hz signal sampled at 100 Hz */
+    const double tau = 0.02;   /* time constant: passes the 1 Hz sine almost intact; see README.md */
     const double Te = 0.01;    /* sampling period */
 
     /* ---- self-test: unit step, 63.2% after tau/Te samples, 99.3% after 5 tau/Te ---- */
